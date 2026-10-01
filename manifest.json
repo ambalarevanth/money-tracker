@@ -1,9 +1,12 @@
 {
   "name": "Money Tracker",
   "short_name": "Money Tracker",
+  "description": "Simple personal expense and money source tracker",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "orientation": "portrait",
+  "background_color": "#f4f6f8",
   "theme_color": "#1f4e79",
   "icons": [
     {
