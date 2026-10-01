@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f4e79">
+<link rel="manifest" href="manifest.json">
+<title>Money Tracker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f5f7fa;color:#17202a}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:18px 16px 90px}
+h1{font-size:24px;margin:4px 0 16px}
+.card{background:white;border-radius:18px;padding:18px;box-shadow:0 2px 12px #0000000d;margin-bottom:14px}
+.total-label{font-size:13px;color:#68737d;font-weight:700;letter-spacing:.6px}
+.total{font-size:34px;font-weight:800;margin-top:4px}
+.section-title{font-size:18px;font-weight:750;margin:20px 2px 10px}
+.row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #edf0f2}
+.row:last-child{border-bottom:0}
+.source-name{font-weight:650}
+.balance{font-weight:750}
+.muted{color:#7a858e;font-size:13px}
+button{border:0;border-radius:13px;padding:12px 16px;font-size:15px;font-weight:700;cursor:pointer}
+.primary{background:#1f4e79;color:white;width:100%;padding:15px}
+.secondary{background:#edf3f8;color:#1f4e79}
+.danger{background:#fff0f0;color:#c62828}
+input,select{width:100%;padding:13px;border:1px solid #d8dee4;border-radius:12px;font-size:16px;background:white}
+label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px}
+.actions{display:flex;gap:8px;margin-top:14px}
+.actions button{flex:1}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:flex-end;justify-content:center;z-index:5}
+.modal.show{display:flex}
+.sheet{background:#fff;width:100%;max-width:520px;border-radius:22px 22px 0 0;padding:20px 16px 28px}
+.close{float:right;background:#eef1f3;padding:7px 11px;border-radius:50%}
+.empty{padding:20px 0;text-align:center;color:#7a858e}
+.small-btn{padding:7px 10px;font-size:12px}
+.install{display:none;background:#fff7df;color:#7a5b00;margin-bottom:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>💰 Money Tracker</h1>
+  <div id="installBox" class="card install">
+    <b>Install Money Tracker</b>
+    <div class="muted" style="margin:6px 0 10px">Add it to your home screen for app-like use.</div>
+    <button class="secondary" id="installBtn">Install App</button>
+  </div>
+
+  <div class="card">
+    <div class="total-label">TOTAL AVAILABLE</div>
+    <div class="total" id="total">₹0</div>
+  </div>
+
+  <div class="section-title">Money Sources</div>
+  <div class="card" id="sources"></div>
+  <button class="secondary" id="addSourceBtn" style="width:100%">+ Add Source</button>
+
+  <div class="section-title">Recent Expenses</div>
+  <div class="card" id="expenses"></div>
+
+  <button class="primary" id="addExpenseBtn">+ Add Expense</button>
+</div>
+
+<div class="modal" id="modal">
+  <div class="sheet">
+    <button class="close" id="close">×</button>
+    <h2 id="modalTitle">Add Expense</h2>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const KEY="moneyTrackerDataV1";
+let data=JSON.parse(localStorage.getItem(KEY)||'{"sources":[],"expenses":[]}');
+let deferredPrompt=null;
+
+function save(){localStorage.setItem(KEY,JSON.stringify(data));render();}
+function money(n){return new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:0}).format(n)}
+function spent(id){return data.expenses.filter(e=>e.sourceId===id).reduce((s,e)=>s+Number(e.amount),0)}
+function balance(s){return Number(s.initial)-spent(s.id)}
+function total(){return data.sources.reduce((s,x)=>s+balance(x),0)}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
+
+function render(){
+ document.getElementById("total").textContent=money(total());
+ const src=document.getElementById("sources");
+ if(!data.sources.length) src.innerHTML='<div class="empty">No sources yet.<br>Add Salary, Gift Card, Card, Cash, etc.</div>';
+ else src.innerHTML=data.sources.map(s=>`
+   <div class="row">
+    <div><div class="source-name">${esc(s.name)}</div><div class="muted">Spent ${money(spent(s.id))}</div></div>
+    <div style="text-align:right"><div class="balance">${money(balance(s))}</div>
+      <button class="small-btn secondary" onclick="editSource('${s.id}')">Edit</button>
+    </div>
+   </div>`).join("");
+
+ const ex=document.getElementById("expenses");
+ const arr=[...data.expenses].sort((a,b)=>b.date-a.date).slice(0,20);
+ ex.innerHTML=arr.length?arr.map(e=>{
+   const s=data.sources.find(x=>x.id===e.sourceId);
+   return `<div class="row">
+    <div><div class="source-name">${esc(e.description||"Expense")}</div><div class="muted">${s?esc(s.name):"Unknown"} · ${new Date(e.date).toLocaleDateString("en-IN")}</div></div>
+    <div style="text-align:right"><div class="balance">-${money(e.amount)}</div>
+    <button class="small-btn danger" onclick="deleteExpense('${e.id}')">Delete</button></div>
+   </div>`;
+ }).join(""):'<div class="empty">No expenses yet.</div>';
+}
+function esc(v){return String(v).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+
+function openModal(title,body){document.getElementById("modalTitle").textContent=title;document.getElementById("modalBody").innerHTML=body;document.getElementById("modal").classList.add("show")}
+function closeModal(){document.getElementById("modal").classList.remove("show")}
+document.getElementById("close").onclick=closeModal;
+document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal()}
+
+document.getElementById("addSourceBtn").onclick=()=>openModal("Add Source",`
+ <label>Source name</label><input id="sname" placeholder="Salary">
+ <label>Initial amount</label><input id="samount" type="number" min="0" step="1" placeholder="29300">
+ <div class="actions"><button class="primary" onclick="addSource()">Save Source</button></div>`);
+
+function addSource(){
+ const name=document.getElementById("sname").value.trim(), amount=Number(document.getElementById("samount").value);
+ if(!name||amount<0)return alert("Enter a valid source and amount.");
+ data.sources.push({id:uid(),name,initial:amount});closeModal();save();
+}
+function editSource(id){
+ const s=data.sources.find(x=>x.id===id);
+ openModal("Edit Source",`
+ <label>Source name</label><input id="sname" value="${esc(s.name)}">
+ <label>Initial amount</label><input id="samount" type="number" min="0" step="1" value="${s.initial}">
+ <div class="actions"><button class="primary" onclick="updateSource('${id}')">Save</button>
+ <button class="danger" onclick="removeSource('${id}')">Delete</button></div>`);
+}
+function updateSource(id){
+ const s=data.sources.find(x=>x.id===id), n=document.getElementById("sname").value.trim(), a=Number(document.getElementById("samount").value);
+ if(!n||a<0)return alert("Enter valid values.");
+ s.name=n;s.initial=a;closeModal();save();
+}
+function removeSource(id){
+ if(data.expenses.some(e=>e.sourceId===id)) return alert("This source has expenses. Delete those expenses first.");
+ if(confirm("Delete this source?")){data.sources=data.sources.filter(s=>s.id!==id);closeModal();save();}
+}
+
+document.getElementById("addExpenseBtn").onclick=()=>{
+ if(!data.sources.length)return alert("Add a money source first.");
+ const opts=data.sources.map(s=>`<option value="${s.id}">${esc(s.name)} — ${money(balance(s))}</option>`).join("");
+ openModal("Add Expense",`
+ <label>Amount</label><input id="eamount" type="number" min="0" step="1" placeholder="500">
+ <label>Description</label><input id="edesc" placeholder="Groceries">
+ <label>Deduct From</label><select id="esource">${opts}</select>
+ <div class="actions"><button class="primary" onclick="addExpense()">Save Expense</button></div>`);
+};
+function addExpense(){
+ const amount=Number(document.getElementById("eamount").value), sourceId=document.getElementById("esource").value, desc=document.getElementById("edesc").value.trim();
+ const s=data.sources.find(x=>x.id===sourceId);
+ if(!s||amount<=0)return alert("Enter a valid amount.");
+ if(amount>balance(s))return alert("Insufficient balance in "+s.name+".");
+ data.expenses.push({id:uid(),amount,sourceId,description:desc,date:Date.now()});
+ closeModal();save();
+}
+function deleteExpense(id){
+ const e=data.expenses.find(x=>x.id===id);
+ if(e&&confirm("Delete this expense? The amount will be restored automatically.")){
+   data.expenses=data.expenses.filter(x=>x.id!==id);save();
+ }
+}
+
+window.addEventListener("beforeinstallprompt",e=>{
+ e.preventDefault();deferredPrompt=e;document.getElementById("installBox").style.display="block";
+});
+document.getElementById("installBtn").onclick=async()=>{
+ if(!deferredPrompt)return;
+ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null;
+ document.getElementById("installBox").style.display="none";
+};
+
+if("serviceWorker" in navigator) navigator.serviceWorker.register("./service-worker.js").catch(()=>{});
+
+// Seed initial sources only on first run
+if(!localStorage.getItem(KEY)){
+ data.sources=[
+  {id:uid(),name:"Salary",initial:29300},
+  {id:uid(),name:"Gift Card",initial:2000},
+  {id:uid(),name:"Card",initial:3000}
+ ];
+ save();
+}else render();
+</script>
+</body>
+</html>
