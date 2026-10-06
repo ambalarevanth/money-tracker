@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Money Tracker Backup</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      padding: 25px;
+      text-align: center;
+    }
+
+    .card {
+      max-width: 450px;
+      margin: 40px auto;
+      background: white;
+      padding: 25px;
+      border-radius: 18px;
+      box-shadow: 0 3px 15px rgba(0,0,0,.08);
+    }
+
+    h1 {
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: #666;
+      line-height: 1.5;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border: 0;
+      border-radius: 12px;
+      background: #1f4e79;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .status {
+      margin-top: 18px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="card">
+
+  <h1>💾 Money Tracker Backup</h1>
+
+  <p>
+    This tool only reads your existing Money Tracker data.
+    It does not delete or modify anything.
+  </p>
+
+  <button onclick="createBackup()">
+    Download Backup
+  </button>
+
+  <div id="status" class="status"></div>
+
+</div>
+
+<script>
+
+function createBackup() {
+
+  const status =
+    document.getElementById("status");
+
+  const data =
+    localStorage.getItem("moneyTrackerDataV4");
+
+  if (!data) {
+
+    status.style.color = "red";
+
+    status.textContent =
+      "❌ No V4 data found on this browser.";
+
+    return;
+  }
+
+  try {
+
+    const parsed =
+      JSON.parse(data);
+
+    const backup = {
+
+      backupVersion: 1,
+
+      appVersion: "Money Tracker V4",
+
+      createdAt:
+        new Date().toISOString(),
+
+      data: parsed
+
+    };
+
+    const json =
+      JSON.stringify(
+        backup,
+        null,
+        2
+      );
+
+    const blob =
+      new Blob(
+        [json],
+        {
+          type: "application/json"
+        }
+      );
+
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
+
+    const date =
+      new Date()
+        .toISOString()
+        .slice(0,10);
+
+    link.href = url;
+
+    link.download =
+      `money-tracker-backup-${date}.json`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    URL.revokeObjectURL(url);
+
+    status.style.color = "green";
+
+    status.textContent =
+      "✅ Backup downloaded successfully.";
+
+  } catch(error) {
+
+    console.error(error);
+
+    status.style.color = "red";
+
+    status.textContent =
+      "❌ Backup could not be created.";
+
+  }
+
+}
+
+</script>
+
+</body>
+</html>
