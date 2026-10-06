@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1f4e79">
 <link rel="manifest" href="manifest.json">
-<title>Money Tracker V4</title>
+<title>Money Tracker V5</title>
 
 <style>
 *{box-sizing:border-box}
@@ -23,6 +23,8 @@
   --soft-red:#fff0f0;
   --warning:#8a6500;
   --soft-warning:#fff7df;
+  --soft-green:#edf8f0;
+  --green:#24733b;
 }
 
 body{
@@ -257,11 +259,21 @@ button:active{
   justify-content:space-between;
   align-items:center;
   margin-bottom:10px;
+  gap:10px;
 }
 
 .month-title{
   font-weight:800;
   font-size:15px;
+  text-align:center;
+  flex:1;
+}
+
+.current-month-btn{
+  display:block;
+  margin:0 auto 10px;
+  padding:7px 11px;
+  font-size:11px;
 }
 
 .search{
@@ -377,6 +389,28 @@ label{
   color:var(--warning);
 }
 
+.backup-card{
+  background:var(--soft-green);
+  color:var(--green);
+}
+
+.backup-description{
+  color:var(--muted);
+  font-size:12px;
+  margin-top:5px;
+  line-height:1.5;
+}
+
+.backup-actions{
+  display:flex;
+  gap:8px;
+  margin-top:12px;
+}
+
+.backup-actions button{
+  flex:1;
+}
+
 .badge{
   display:inline-block;
   padding:3px 7px;
@@ -391,6 +425,7 @@ label{
   .total{font-size:31px}
   .header-title{font-size:22px}
   .filters{grid-template-columns:1fr}
+  .backup-actions{flex-direction:column}
 }
 </style>
 </head>
@@ -494,7 +529,6 @@ label{
     </div>
   </div>
 
-
   <!-- SPENDING OVERVIEW -->
   <div class="section-title">
     Spending Overview
@@ -504,7 +538,6 @@ label{
     id="dashboard"
     class="card"
   ></div>
-
 
   <!-- MONEY SOURCES -->
   <div class="section-title">
@@ -533,7 +566,6 @@ label{
     </button>
 
   </div>
-
 
   <!-- MONTHLY SPENDING -->
   <div class="section-title">
@@ -565,10 +597,16 @@ label{
 
     </div>
 
+    <button
+      class="secondary current-month-btn"
+      onclick="goToCurrentMonth()"
+    >
+      Go to Current Month
+    </button>
+
     <div id="chart"></div>
 
   </div>
-
 
   <!-- EXPENSES -->
   <div class="section-title">
@@ -576,6 +614,37 @@ label{
   </div>
 
   <div class="card">
+
+    <!-- AUTOMATIC MONTH VIEW -->
+    <div class="month-nav">
+
+      <button
+        class="secondary"
+        onclick="changeExpenseMonth(-1)"
+      >
+        ←
+      </button>
+
+      <div
+        id="expenseMonthTitle"
+        class="month-title"
+      ></div>
+
+      <button
+        class="secondary"
+        onclick="changeExpenseMonth(1)"
+      >
+        →
+      </button>
+
+    </div>
+
+    <button
+      class="secondary current-month-btn"
+      onclick="goToCurrentMonth()"
+    >
+      Go to Current Month
+    </button>
 
     <input
       id="search"
@@ -610,7 +679,6 @@ label{
 
   </div>
 
-
   <!-- MONTHLY HISTORY -->
   <div class="section-title">
     Monthly History
@@ -620,6 +688,40 @@ label{
     id="history"
     class="card"
   ></div>
+
+  <!-- DATA SAFETY -->
+  <div class="section-title">
+    Data Safety
+  </div>
+
+  <div class="card backup-card">
+
+    <strong>🔒 Backup & Restore</strong>
+
+    <div class="backup-description">
+      Keep a copy of your expenses, sources, balances,
+      categories and transaction history.
+    </div>
+
+    <div class="backup-actions">
+
+      <button
+        id="exportBackupBtn"
+        class="secondary"
+      >
+        💾 Export Backup
+      </button>
+
+      <button
+        id="importBackupBtn"
+        class="secondary"
+      >
+        📥 Import Backup
+      </button>
+
+    </div>
+
+  </div>
 
 </div>
 
@@ -656,10 +758,22 @@ label{
 </div>
 
 
+<!-- Hidden file input for backup import -->
+
+<input
+  id="backupFileInput"
+  type="file"
+  accept=".json,application/json"
+  style="display:none"
+>
+
+
 <script>
 
 /* =========================================================
-   V4 DATA STORAGE
+   V5 DATA STORAGE
+   IMPORTANT:
+   KEEPING THE SAME V4 KEY PRESERVES EXISTING DATA.
 ========================================================= */
 
 const CURRENT_KEY = "moneyTrackerDataV4";
@@ -713,6 +827,28 @@ function initializeData(){
           ? data.income
           : [];
 
+      /*
+       * Ensure old expenses without categories
+       * continue to work.
+       */
+
+      data.expenses =
+        data.expenses.map(expense => {
+
+          if(
+            !expense.category ||
+            String(expense.category).trim() === ""
+          ){
+
+            expense.category =
+              "Uncategorized";
+
+          }
+
+          return expense;
+
+        });
+
       return;
 
     }catch(error){
@@ -729,15 +865,11 @@ function initializeData(){
 
   /*
    * Migrate V3 data.
-   *
-   * IMPORTANT:
-   * We don't delete V3 data.
-   * It remains in localStorage as a safety copy.
+   * V3 is NOT deleted.
    */
 
   const old =
     localStorage.getItem(OLD_KEY);
-
 
   if(old){
 
@@ -760,20 +892,12 @@ function initializeData(){
           ? data.income
           : [];
 
-
-      /*
-       * Old V3 expenses may not have category.
-       *
-       * We deliberately use "Uncategorized"
-       * instead of "Other".
-       */
-
       data.expenses =
         data.expenses.map(expense => {
 
           if(
             !expense.category ||
-            expense.category.trim() === ""
+            String(expense.category).trim() === ""
           ){
 
             expense.category =
@@ -785,12 +909,10 @@ function initializeData(){
 
         });
 
-
       localStorage.setItem(
         CURRENT_KEY,
         JSON.stringify(data)
       );
-
 
       return;
 
@@ -839,7 +961,6 @@ function initializeData(){
     income: []
 
   };
-
 
   localStorage.setItem(
     CURRENT_KEY,
@@ -930,6 +1051,29 @@ function monthKey(date){
   return `${d.getFullYear()}-${String(
     d.getMonth()+1
   ).padStart(2,"0")}`;
+
+}
+
+
+function formatMonth(date){
+
+  return new Date(date).toLocaleDateString(
+    "en-IN",
+    {
+      month:"long",
+      year:"numeric"
+    }
+  );
+
+}
+
+
+function isCurrentMonth(date){
+
+  return (
+    monthKey(date) ===
+    monthKey(Date.now())
+  );
 
 }
 
@@ -1044,7 +1188,6 @@ function render(){
     .textContent =
     money(totalAvailable());
 
-
   document.getElementById("monthSpent")
     .textContent =
     money(
@@ -1053,11 +1196,9 @@ function render(){
       )
     );
 
-
   document.getElementById("todaySpent")
     .textContent =
     money(todayTotal());
-
 
   renderUncategorized();
   renderDashboard();
@@ -1084,7 +1225,6 @@ function renderUncategorized(){
       "uncategorizedCard"
     );
 
-
   if(count === 0){
 
     card.style.display = "none";
@@ -1093,9 +1233,7 @@ function renderUncategorized(){
 
   }
 
-
   card.style.display = "block";
-
 
   document.getElementById(
     "uncategorizedCount"
@@ -1121,26 +1259,21 @@ function renderDashboard(){
 
   const totals = {};
 
-
   data.expenses
-
     .filter(
       e => monthKey(e.date) === month
     )
-
     .forEach(e => {
 
       const category =
         e.category ||
         "Uncategorized";
 
-
       totals[category] =
         (totals[category] || 0) +
         Number(e.amount);
 
     });
-
 
   const entries =
     Object.entries(totals)
@@ -1149,12 +1282,10 @@ function renderDashboard(){
       )
       .slice(0,8);
 
-
   const container =
     document.getElementById(
       "dashboard"
     );
-
 
   if(!entries.length){
 
@@ -1167,10 +1298,8 @@ function renderDashboard(){
 
   }
 
-
   const max =
     entries[0][1] || 1;
-
 
   container.innerHTML =
     entries.map(
@@ -1220,7 +1349,6 @@ function renderSources(){
       "sources"
     );
 
-
   if(!data.sources.length){
 
     container.innerHTML =
@@ -1232,7 +1360,6 @@ function renderSources(){
 
   }
 
-
   container.innerHTML =
     data.sources.map(source => {
 
@@ -1241,7 +1368,6 @@ function renderSources(){
 
       const added =
         sourceIncome(source.id);
-
 
       return `
 
@@ -1308,7 +1434,6 @@ function populateFilters(){
   const oldCategory =
     category.value;
 
-
   category.innerHTML =
     `<option value="">
       All Categories
@@ -1321,10 +1446,8 @@ function populateFilters(){
         </option>`
     ).join("");
 
-
   category.value =
     oldCategory;
-
 
   const source =
     document.getElementById(
@@ -1333,7 +1456,6 @@ function populateFilters(){
 
   const oldSource =
     source.value;
-
 
   source.innerHTML =
     `<option value="">
@@ -1347,7 +1469,6 @@ function populateFilters(){
         </option>`
     ).join("");
 
-
   source.value =
     oldSource;
 
@@ -1356,9 +1477,56 @@ function populateFilters(){
 
 /* =========================================================
    EXPENSES
+   IMPORTANT:
+   DEFAULT VIEW = CURRENT MONTH
 ========================================================= */
 
 function renderExpenses(){
+
+  /*
+   * If the app was left open across a month change,
+   * automatically move the expense view to the new month.
+   */
+
+  const todayMonth =
+    monthKey(Date.now());
+
+  if(
+    !window.lastKnownMonth ||
+    window.lastKnownMonth !== todayMonth
+  ){
+
+    window.lastKnownMonth =
+      todayMonth;
+
+    /*
+     * Only automatically switch if the user
+     * was previously looking at the current month.
+     *
+     * This prevents unexpectedly changing a manually
+     * selected historical month.
+     */
+
+    if(
+      !window.expenseMonthManuallyChanged
+    ){
+
+      viewMonth =
+        new Date();
+
+    }
+
+  }
+
+
+  const selectedMonth =
+    monthKey(viewMonth);
+
+  document.getElementById(
+    "expenseMonthTitle"
+  ).textContent =
+    formatMonth(viewMonth);
+
 
   const search =
     document.getElementById(
@@ -1367,12 +1535,10 @@ function renderExpenses(){
       .toLowerCase()
       .trim();
 
-
   const category =
     document.getElementById(
       "catFilter"
     ).value;
-
 
   const source =
     document.getElementById(
@@ -1383,13 +1549,23 @@ function renderExpenses(){
   const expenses =
     [...data.expenses]
 
+      /*
+       * THIS IS THE MAIN V5 CHANGE:
+       * Only show expenses for selected month.
+       */
+
+      .filter(
+        expense =>
+          monthKey(expense.date) ===
+          selectedMonth
+      )
+
       .filter(expense => {
 
         const text =
           `${expense.description || ""} ${
             expense.category || ""
           }`.toLowerCase();
-
 
         return (
 
@@ -1425,7 +1601,9 @@ function renderExpenses(){
 
     container.innerHTML =
       `<div class="empty">
-        No matching expenses.
+        No expenses for ${escapeHtml(
+          formatMonth(viewMonth)
+        )}.
       </div>`;
 
     return;
@@ -1441,11 +1619,9 @@ function renderExpenses(){
           s => s.id === expense.sourceId
         );
 
-
       const category =
         expense.category ||
         "Uncategorized";
-
 
       const badge =
         category === "Uncategorized"
@@ -1453,7 +1629,6 @@ function renderExpenses(){
                Needs category
              </span>`
           : "";
-
 
       return `
 
@@ -1495,7 +1670,6 @@ function renderExpenses(){
             </div>
 
           </div>
-
 
           <div class="expense-right">
 
@@ -1543,8 +1717,12 @@ function renderChart(){
   const month =
     monthKey(viewMonth);
 
-  const totals = {};
+  document.getElementById(
+    "monthTitle"
+  ).textContent =
+    formatMonth(viewMonth);
 
+  const totals = {};
 
   data.expenses
 
@@ -1558,13 +1736,11 @@ function renderChart(){
         e.category ||
         "Uncategorized";
 
-
       totals[category] =
         (totals[category] || 0) +
         Number(e.amount);
 
     });
-
 
   const entries =
     Object.entries(totals)
@@ -1572,24 +1748,10 @@ function renderChart(){
         (a,b) => b[1] - a[1]
       );
 
-
-  document.getElementById(
-    "monthTitle"
-  ).textContent =
-    viewMonth.toLocaleDateString(
-      "en-IN",
-      {
-        month:"long",
-        year:"numeric"
-      }
-    );
-
-
   const container =
     document.getElementById(
       "chart"
     );
-
 
   if(!entries.length){
 
@@ -1602,10 +1764,8 @@ function renderChart(){
 
   }
 
-
   const max =
     entries[0][1] || 1;
-
 
   container.innerHTML =
     entries.map(
@@ -1650,7 +1810,40 @@ function changeMonth(amount){
     viewMonth.getMonth() + amount
   );
 
+  window.expenseMonthManuallyChanged =
+    true;
+
   renderChart();
+  renderExpenses();
+
+}
+
+
+function changeExpenseMonth(amount){
+
+  viewMonth.setMonth(
+    viewMonth.getMonth() + amount
+  );
+
+  window.expenseMonthManuallyChanged =
+    true;
+
+  renderChart();
+  renderExpenses();
+
+}
+
+
+function goToCurrentMonth(){
+
+  viewMonth =
+    new Date();
+
+  window.expenseMonthManuallyChanged =
+    false;
+
+  renderChart();
+  renderExpenses();
 
 }
 
@@ -1663,19 +1856,16 @@ function renderHistory(){
 
   const months = {};
 
-
   data.expenses.forEach(expense => {
 
     const month =
       monthKey(expense.date);
-
 
     months[month] =
       (months[month] || 0) +
       Number(expense.amount);
 
   });
-
 
   const entries =
     Object.entries(months)
@@ -1685,12 +1875,10 @@ function renderHistory(){
       )
       .slice(0,12);
 
-
   const container =
     document.getElementById(
       "history"
     );
-
 
   if(!entries.length){
 
@@ -1703,7 +1891,6 @@ function renderHistory(){
 
   }
 
-
   container.innerHTML =
     entries.map(
       ([key,amount]) => {
@@ -1711,14 +1898,12 @@ function renderHistory(){
         const [year,month] =
           key.split("-");
 
-
         const date =
           new Date(
             Number(year),
             Number(month)-1,
             1
           );
-
 
         return `
 
@@ -1749,6 +1934,353 @@ function renderHistory(){
 
 
 /* =========================================================
+   BACKUP / RESTORE
+========================================================= */
+
+function createBackupObject(){
+
+  return {
+
+    backupVersion:2,
+
+    appVersion:"Money Tracker V5",
+
+    createdAt:
+      new Date().toISOString(),
+
+    data:JSON.parse(
+      JSON.stringify(data)
+    )
+
+  };
+
+}
+
+
+function exportBackup(){
+
+  try{
+
+    const backup =
+      createBackupObject();
+
+    const json =
+      JSON.stringify(
+        backup,
+        null,
+        2
+      );
+
+    const blob =
+      new Blob(
+        [json],
+        {
+          type:"application/json"
+        }
+      );
+
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement("a");
+
+    const date =
+      new Date()
+        .toISOString()
+        .slice(0,10);
+
+    link.href = url;
+
+    link.download =
+      `money-tracker-backup-${date}.json`;
+
+    document.body.appendChild(link);
+
+    link.click();
+
+    link.remove();
+
+    URL.revokeObjectURL(url);
+
+    alert(
+      "Backup downloaded successfully."
+    );
+
+  }catch(error){
+
+    console.error(error);
+
+    alert(
+      "Could not create backup."
+    );
+
+  }
+
+}
+
+
+function validateBackup(backup){
+
+  if(
+    !backup ||
+    typeof backup !== "object"
+  ){
+
+    return false;
+
+  }
+
+
+  const backupData =
+    backup.data;
+
+  if(
+    !backupData ||
+    typeof backupData !== "object"
+  ){
+
+    return false;
+
+  }
+
+
+  if(
+    !Array.isArray(
+      backupData.sources
+    )
+  ){
+
+    return false;
+
+  }
+
+
+  if(
+    !Array.isArray(
+      backupData.expenses
+    )
+  ){
+
+    return false;
+
+  }
+
+
+  if(
+    !Array.isArray(
+      backupData.income
+    )
+  ){
+
+    return false;
+
+  }
+
+
+  return true;
+
+}
+
+
+function importBackupFile(file){
+
+  const reader =
+    new FileReader();
+
+
+  reader.onload = event => {
+
+    try{
+
+      const backup =
+        JSON.parse(
+          event.target.result
+        );
+
+
+      if(
+        !validateBackup(backup)
+      ){
+
+        alert(
+          "This does not look like a valid Money Tracker backup."
+        );
+
+        return;
+
+      }
+
+
+      const backupData =
+        backup.data;
+
+
+      const confirmed =
+        confirm(
+          "Import this backup?\n\n" +
+          "This will replace the current app data with the backup data.\n\n" +
+          "Your current data should already be backed up before continuing."
+        );
+
+
+      if(!confirmed){
+
+        return;
+
+      }
+
+
+      /*
+       * Create an emergency local safety copy
+       * before importing.
+       */
+
+      const safetyCopy =
+        localStorage.getItem(
+          CURRENT_KEY
+        );
+
+
+      if(safetyCopy){
+
+        localStorage.setItem(
+          "moneyTrackerEmergencyBackup",
+          safetyCopy
+        );
+
+      }
+
+
+      data = {
+
+        sources:
+          Array.isArray(
+            backupData.sources
+          )
+            ? backupData.sources
+            : [],
+
+        expenses:
+          Array.isArray(
+            backupData.expenses
+          )
+            ? backupData.expenses
+            : [],
+
+        income:
+          Array.isArray(
+            backupData.income
+          )
+            ? backupData.income
+            : []
+
+      };
+
+
+      /*
+       * Normalize categories.
+       */
+
+      data.expenses =
+        data.expenses.map(expense => {
+
+          if(
+            !expense.category ||
+            String(expense.category).trim() === ""
+          ){
+
+            expense.category =
+              "Uncategorized";
+
+          }
+
+          return expense;
+
+        });
+
+
+      localStorage.setItem(
+        CURRENT_KEY,
+        JSON.stringify(data)
+      );
+
+
+      viewMonth =
+        new Date();
+
+      window.expenseMonthManuallyChanged =
+        false;
+
+
+      render();
+
+      alert(
+        "Backup imported successfully."
+      );
+
+
+    }catch(error){
+
+      console.error(error);
+
+      alert(
+        "Could not read this backup file."
+      );
+
+    }
+
+  };
+
+
+  reader.readAsText(file);
+
+}
+
+
+document.getElementById(
+  "exportBackupBtn"
+).onclick =
+  exportBackup;
+
+
+document.getElementById(
+  "importBackupBtn"
+).onclick = () => {
+
+  document.getElementById(
+    "backupFileInput"
+  ).click();
+
+};
+
+
+document.getElementById(
+  "backupFileInput"
+).addEventListener(
+  "change",
+  event => {
+
+    const file =
+      event.target.files[0];
+
+    if(file){
+
+      importBackupFile(file);
+
+    }
+
+    /*
+     * Allow selecting the same backup again later.
+     */
+
+    event.target.value = "";
+
+  }
+);
+
+
+/* =========================================================
    MODAL
 ========================================================= */
 
@@ -1758,11 +2290,9 @@ function openModal(title,content){
     "modalTitle"
   ).textContent = title;
 
-
   document.getElementById(
     "modalBody"
   ).innerHTML = content;
-
 
   document.getElementById(
     "modal"
@@ -1859,14 +2389,12 @@ function addSource(){
       "sname"
     ).value.trim();
 
-
   const amount =
     Number(
       document.getElementById(
         "samount"
       ).value
     );
-
 
   if(!name || amount < 0){
 
@@ -1878,7 +2406,6 @@ function addSource(){
 
   }
 
-
   data.sources.push({
 
     id:uid(),
@@ -1886,7 +2413,6 @@ function addSource(){
     initial:amount
 
   });
-
 
   closeModal();
 
@@ -1905,7 +2431,6 @@ function editSource(id){
     data.sources.find(
       s => s.id === id
     );
-
 
   openModal(
 
@@ -1967,12 +2492,10 @@ function updateSource(id){
       s => s.id === id
     );
 
-
   const name =
     document.getElementById(
       "sname"
     ).value.trim();
-
 
   const amount =
     Number(
@@ -1980,7 +2503,6 @@ function updateSource(id){
         "samount"
       ).value
     );
-
 
   if(!name || amount < 0){
 
@@ -1992,10 +2514,8 @@ function updateSource(id){
 
   }
 
-
   source.name = name;
   source.initial = amount;
-
 
   closeModal();
 
@@ -2011,12 +2531,10 @@ function removeSource(id){
       e => e.sourceId === id
     );
 
-
   const hasIncome =
     data.income.some(
       e => e.sourceId === id
     );
-
 
   if(
     hasExpenses ||
@@ -2030,7 +2548,6 @@ function removeSource(id){
     return;
 
   }
-
 
   if(
     confirm(
@@ -2070,7 +2587,6 @@ document.getElementById(
 
   }
 
-
   const options =
     data.sources.map(
       source => `
@@ -2083,7 +2599,6 @@ document.getElementById(
 
       `
     ).join("");
-
 
   openModal(
 
@@ -2146,18 +2661,15 @@ function addMoney(){
       ).value
     );
 
-
   const sourceId =
     document.getElementById(
       "isource"
     ).value;
 
-
   const description =
     document.getElementById(
       "idesc"
     ).value.trim();
-
 
   if(amount <= 0){
 
@@ -2169,7 +2681,6 @@ function addMoney(){
 
   }
 
-
   data.income.push({
 
     id:uid(),
@@ -2179,7 +2690,6 @@ function addMoney(){
     date:Date.now()
 
   });
-
 
   closeModal();
 
@@ -2206,7 +2716,6 @@ document.getElementById(
 
   }
 
-
   const sourceOptions =
     data.sources.map(
       source => `
@@ -2224,7 +2733,6 @@ document.getElementById(
       `
     ).join("");
 
-
   const categoryOptions =
     categories
       .filter(
@@ -2236,7 +2744,6 @@ document.getElementById(
             ${escapeHtml(c)}
           </option>`
       ).join("");
-
 
   openModal(
 
@@ -2308,30 +2815,25 @@ function addExpense(){
       ).value
     );
 
-
   const sourceId =
     document.getElementById(
       "esource"
     ).value;
-
 
   const description =
     document.getElementById(
       "edesc"
     ).value.trim();
 
-
   const category =
     document.getElementById(
       "ecat"
     ).value;
 
-
   const source =
     data.sources.find(
       s => s.id === sourceId
     );
-
 
   if(
     !source ||
@@ -2346,7 +2848,6 @@ function addExpense(){
 
   }
 
-
   if(
     amount >
     sourceBalance(source)
@@ -2360,7 +2861,6 @@ function addExpense(){
 
   }
 
-
   data.expenses.push({
 
     id:uid(),
@@ -2371,7 +2871,6 @@ function addExpense(){
     date:Date.now()
 
   });
-
 
   closeModal();
 
@@ -2391,14 +2890,12 @@ function editExpense(id){
       e => e.id === id
     );
 
-
   const sourceOptions =
     data.sources.map(
       source => {
 
         let available =
           sourceBalance(source);
-
 
         if(
           source.id ===
@@ -2411,7 +2908,6 @@ function editExpense(id){
             );
 
         }
-
 
         return `
 
@@ -2436,7 +2932,6 @@ function editExpense(id){
       }
     ).join("");
 
-
   const categoryOptions =
     categories.map(
       category => `
@@ -2455,7 +2950,6 @@ function editExpense(id){
 
       `
     ).join("");
-
 
   openModal(
 
@@ -2526,7 +3020,6 @@ function updateExpense(id){
       e => e.id === id
     );
 
-
   const amount =
     Number(
       document.getElementById(
@@ -2534,18 +3027,15 @@ function updateExpense(id){
       ).value
     );
 
-
   const newSourceId =
     document.getElementById(
       "esource"
     ).value;
 
-
   const newSource =
     data.sources.find(
       s => s.id === newSourceId
     );
-
 
   if(
     !newSource ||
@@ -2560,10 +3050,8 @@ function updateExpense(id){
 
   }
 
-
   let available =
     sourceBalance(newSource);
-
 
   if(
     newSourceId ===
@@ -2576,7 +3064,6 @@ function updateExpense(id){
       );
 
   }
-
 
   if(
     amount >
@@ -2591,26 +3078,21 @@ function updateExpense(id){
 
   }
 
-
   expense.amount =
     amount;
 
-
   expense.sourceId =
     newSourceId;
-
 
   expense.description =
     document.getElementById(
       "edesc"
     ).value.trim();
 
-
   expense.category =
     document.getElementById(
       "ecat"
     ).value;
-
 
   closeModal();
 
@@ -2635,12 +3117,10 @@ function deleteExpense(id){
 
   }
 
-
   data.expenses =
     data.expenses.filter(
       e => e.id !== id
     );
-
 
   save();
 
@@ -2676,7 +3156,6 @@ document.getElementById(
     return;
 
   }
-
 
   deferredPrompt.prompt();
 
@@ -2719,6 +3198,15 @@ if(
 ========================================================= */
 
 initializeData();
+
+viewMonth =
+  new Date();
+
+window.lastKnownMonth =
+  monthKey(Date.now());
+
+window.expenseMonthManuallyChanged =
+  false;
 
 render();
 
