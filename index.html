@@ -1,9 +1,11 @@
+```html
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#1f4e79">
+<meta name="description" content="Simple personal money and expense tracker">
 <link rel="manifest" href="manifest.json">
 <title>Money Tracker V5</title>
 
@@ -23,8 +25,6 @@
   --soft-red:#fff0f0;
   --warning:#8a6500;
   --soft-warning:#fff7df;
-  --soft-green:#edf8f0;
-  --green:#24733b;
 }
 
 body{
@@ -236,6 +236,7 @@ button:active{
 .category-top{
   display:flex;
   justify-content:space-between;
+  gap:10px;
   font-size:14px;
   font-weight:700;
 }
@@ -259,21 +260,11 @@ button:active{
   justify-content:space-between;
   align-items:center;
   margin-bottom:10px;
-  gap:10px;
 }
 
 .month-title{
   font-weight:800;
   font-size:15px;
-  text-align:center;
-  flex:1;
-}
-
-.current-month-btn{
-  display:block;
-  margin:0 auto 10px;
-  padding:7px 11px;
-  font-size:11px;
 }
 
 .search{
@@ -389,28 +380,6 @@ label{
   color:var(--warning);
 }
 
-.backup-card{
-  background:var(--soft-green);
-  color:var(--green);
-}
-
-.backup-description{
-  color:var(--muted);
-  font-size:12px;
-  margin-top:5px;
-  line-height:1.5;
-}
-
-.backup-actions{
-  display:flex;
-  gap:8px;
-  margin-top:12px;
-}
-
-.backup-actions button{
-  flex:1;
-}
-
 .badge{
   display:inline-block;
   padding:3px 7px;
@@ -421,11 +390,65 @@ label{
   color:var(--warning);
 }
 
+.month-summary-main{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+}
+
+.month-summary-title{
+  font-size:18px;
+  font-weight:850;
+}
+
+.month-summary-count{
+  color:var(--muted);
+  font-size:12px;
+  margin-top:4px;
+}
+
+.month-summary-total{
+  font-size:20px;
+  font-weight:850;
+  color:var(--danger);
+  text-align:right;
+}
+
+.top-category{
+  margin-top:14px;
+  padding:12px;
+  background:#f7f9fb;
+  border-radius:13px;
+}
+
+.top-category-label{
+  color:var(--muted);
+  font-size:11px;
+  font-weight:800;
+}
+
+.top-category-value{
+  font-size:14px;
+  font-weight:800;
+  margin-top:3px;
+}
+
+.view-month-btn{
+  width:100%;
+  margin-top:12px;
+}
+
 @media(max-width:380px){
   .total{font-size:31px}
   .header-title{font-size:22px}
   .filters{grid-template-columns:1fr}
-  .backup-actions{flex-direction:column}
+  .month-summary-main{
+    flex-direction:column;
+  }
+  .month-summary-total{
+    text-align:left;
+  }
 }
 </style>
 </head>
@@ -443,6 +466,7 @@ label{
 
   <div id="installBox" class="card install-card">
     <strong>Install Money Tracker</strong>
+
     <div class="source-meta">
       Add it to your home screen for quick access.
     </div>
@@ -597,13 +621,6 @@ label{
 
     </div>
 
-    <button
-      class="secondary current-month-btn"
-      onclick="goToCurrentMonth()"
-    >
-      Go to Current Month
-    </button>
-
     <div id="chart"></div>
 
   </div>
@@ -614,37 +631,6 @@ label{
   </div>
 
   <div class="card">
-
-    <!-- AUTOMATIC MONTH VIEW -->
-    <div class="month-nav">
-
-      <button
-        class="secondary"
-        onclick="changeExpenseMonth(-1)"
-      >
-        ←
-      </button>
-
-      <div
-        id="expenseMonthTitle"
-        class="month-title"
-      ></div>
-
-      <button
-        class="secondary"
-        onclick="changeExpenseMonth(1)"
-      >
-        →
-      </button>
-
-    </div>
-
-    <button
-      class="secondary current-month-btn"
-      onclick="goToCurrentMonth()"
-    >
-      Go to Current Month
-    </button>
 
     <input
       id="search"
@@ -679,52 +665,17 @@ label{
 
   </div>
 
-  <!-- MONTHLY HISTORY -->
+  <!-- CURRENT MONTH HISTORY -->
   <div class="section-title">
     Monthly History
   </div>
 
   <div
-    id="history"
+    id="currentMonthSummary"
     class="card"
   ></div>
 
-  <!-- DATA SAFETY -->
-  <div class="section-title">
-    Data Safety
-  </div>
-
-  <div class="card backup-card">
-
-    <strong>🔒 Backup & Restore</strong>
-
-    <div class="backup-description">
-      Keep a copy of your expenses, sources, balances,
-      categories and transaction history.
-    </div>
-
-    <div class="backup-actions">
-
-      <button
-        id="exportBackupBtn"
-        class="secondary"
-      >
-        💾 Export Backup
-      </button>
-
-      <button
-        id="importBackupBtn"
-        class="secondary"
-      >
-        📥 Import Backup
-      </button>
-
-    </div>
-
-  </div>
-
 </div>
-
 
 <!-- MODAL -->
 
@@ -757,23 +708,10 @@ label{
 
 </div>
 
-
-<!-- Hidden file input for backup import -->
-
-<input
-  id="backupFileInput"
-  type="file"
-  accept=".json,application/json"
-  style="display:none"
->
-
-
 <script>
 
 /* =========================================================
-   V5 DATA STORAGE
-   IMPORTANT:
-   KEEPING THE SAME V4 KEY PRESERVES EXISTING DATA.
+   DATA STORAGE
 ========================================================= */
 
 const CURRENT_KEY = "moneyTrackerDataV4";
@@ -827,28 +765,6 @@ function initializeData(){
           ? data.income
           : [];
 
-      /*
-       * Ensure old expenses without categories
-       * continue to work.
-       */
-
-      data.expenses =
-        data.expenses.map(expense => {
-
-          if(
-            !expense.category ||
-            String(expense.category).trim() === ""
-          ){
-
-            expense.category =
-              "Uncategorized";
-
-          }
-
-          return expense;
-
-        });
-
       return;
 
     }catch(error){
@@ -861,12 +777,6 @@ function initializeData(){
     }
 
   }
-
-
-  /*
-   * Migrate V3 data.
-   * V3 is NOT deleted.
-   */
 
   const old =
     localStorage.getItem(OLD_KEY);
@@ -897,7 +807,7 @@ function initializeData(){
 
           if(
             !expense.category ||
-            String(expense.category).trim() === ""
+            expense.category.trim() === ""
           ){
 
             expense.category =
@@ -926,11 +836,6 @@ function initializeData(){
     }
 
   }
-
-
-  /*
-   * Brand new installation.
-   */
 
   data = {
 
@@ -1051,29 +956,6 @@ function monthKey(date){
   return `${d.getFullYear()}-${String(
     d.getMonth()+1
   ).padStart(2,"0")}`;
-
-}
-
-
-function formatMonth(date){
-
-  return new Date(date).toLocaleDateString(
-    "en-IN",
-    {
-      month:"long",
-      year:"numeric"
-    }
-  );
-
-}
-
-
-function isCurrentMonth(date){
-
-  return (
-    monthKey(date) ===
-    monthKey(Date.now())
-  );
 
 }
 
@@ -1477,56 +1359,9 @@ function populateFilters(){
 
 /* =========================================================
    EXPENSES
-   IMPORTANT:
-   DEFAULT VIEW = CURRENT MONTH
 ========================================================= */
 
 function renderExpenses(){
-
-  /*
-   * If the app was left open across a month change,
-   * automatically move the expense view to the new month.
-   */
-
-  const todayMonth =
-    monthKey(Date.now());
-
-  if(
-    !window.lastKnownMonth ||
-    window.lastKnownMonth !== todayMonth
-  ){
-
-    window.lastKnownMonth =
-      todayMonth;
-
-    /*
-     * Only automatically switch if the user
-     * was previously looking at the current month.
-     *
-     * This prevents unexpectedly changing a manually
-     * selected historical month.
-     */
-
-    if(
-      !window.expenseMonthManuallyChanged
-    ){
-
-      viewMonth =
-        new Date();
-
-    }
-
-  }
-
-
-  const selectedMonth =
-    monthKey(viewMonth);
-
-  document.getElementById(
-    "expenseMonthTitle"
-  ).textContent =
-    formatMonth(viewMonth);
-
 
   const search =
     document.getElementById(
@@ -1545,20 +1380,8 @@ function renderExpenses(){
       "srcFilter"
     ).value;
 
-
   const expenses =
     [...data.expenses]
-
-      /*
-       * THIS IS THE MAIN V5 CHANGE:
-       * Only show expenses for selected month.
-       */
-
-      .filter(
-        expense =>
-          monthKey(expense.date) ===
-          selectedMonth
-      )
 
       .filter(expense => {
 
@@ -1590,26 +1413,21 @@ function renderExpenses(){
         (a,b) => b.date - a.date
       );
 
-
   const container =
     document.getElementById(
       "expenses"
     );
 
-
   if(!expenses.length){
 
     container.innerHTML =
       `<div class="empty">
-        No expenses for ${escapeHtml(
-          formatMonth(viewMonth)
-        )}.
+        No matching expenses.
       </div>`;
 
     return;
 
   }
-
 
   container.innerHTML =
     expenses.map(expense => {
@@ -1717,11 +1535,6 @@ function renderChart(){
   const month =
     monthKey(viewMonth);
 
-  document.getElementById(
-    "monthTitle"
-  ).textContent =
-    formatMonth(viewMonth);
-
   const totals = {};
 
   data.expenses
@@ -1747,6 +1560,17 @@ function renderChart(){
       .sort(
         (a,b) => b[1] - a[1]
       );
+
+  document.getElementById(
+    "monthTitle"
+  ).textContent =
+    viewMonth.toLocaleDateString(
+      "en-IN",
+      {
+        month:"long",
+        year:"numeric"
+      }
+    );
 
   const container =
     document.getElementById(
@@ -1810,474 +1634,272 @@ function changeMonth(amount){
     viewMonth.getMonth() + amount
   );
 
-  window.expenseMonthManuallyChanged =
-    true;
-
   renderChart();
-  renderExpenses();
-
-}
-
-
-function changeExpenseMonth(amount){
-
-  viewMonth.setMonth(
-    viewMonth.getMonth() + amount
-  );
-
-  window.expenseMonthManuallyChanged =
-    true;
-
-  renderChart();
-  renderExpenses();
-
-}
-
-
-function goToCurrentMonth(){
-
-  viewMonth =
-    new Date();
-
-  window.expenseMonthManuallyChanged =
-    false;
-
-  renderChart();
-  renderExpenses();
 
 }
 
 
 /* =========================================================
-   HISTORY
+   CURRENT MONTH HISTORY
 ========================================================= */
 
 function renderHistory(){
 
-  const months = {};
+  const currentMonth =
+    monthKey(Date.now());
 
-  data.expenses.forEach(expense => {
+  const expenses =
+    data.expenses.filter(
+      expense =>
+        monthKey(expense.date) === currentMonth
+    );
 
-    const month =
-      monthKey(expense.date);
+  const total =
+    expenses.reduce(
+      (sum, expense) =>
+        sum + Number(expense.amount),
+      0
+    );
 
-    months[month] =
-      (months[month] || 0) +
+  const categoryTotals = {};
+
+  expenses.forEach(expense => {
+
+    const category =
+      expense.category ||
+      "Uncategorized";
+
+    categoryTotals[category] =
+      (categoryTotals[category] || 0) +
       Number(expense.amount);
 
   });
 
-  const entries =
-    Object.entries(months)
-      .sort(
-        (a,b) =>
-          b[0].localeCompare(a[0])
-      )
-      .slice(0,12);
+  const topCategory =
+    Object.entries(categoryTotals)
+      .sort((a,b) => b[1] - a[1])[0];
+
+  const [year, month] =
+    currentMonth.split("-");
+
+  const date =
+    new Date(
+      Number(year),
+      Number(month) - 1,
+      1
+    );
+
+  const monthName =
+    date.toLocaleDateString(
+      "en-IN",
+      {
+        month:"long",
+        year:"numeric"
+      }
+    );
 
   const container =
     document.getElementById(
-      "history"
+      "currentMonthSummary"
     );
 
-  if(!entries.length){
+  container.innerHTML = `
 
-    container.innerHTML =
-      `<div class="empty">
-        No monthly history yet.
-      </div>`;
+    <div class="month-summary-main">
 
-    return;
+      <div>
 
-  }
+        <div class="month-summary-title">
+          ${monthName}
+        </div>
 
-  container.innerHTML =
-    entries.map(
-      ([key,amount]) => {
+        <div class="month-summary-count">
+          ${expenses.length}
+          ${
+            expenses.length === 1
+              ? "expense"
+              : "expenses"
+          }
+        </div>
 
-        const [year,month] =
-          key.split("-");
+      </div>
 
-        const date =
-          new Date(
-            Number(year),
-            Number(month)-1,
-            1
-          );
+      <div class="month-summary-total">
+        ${money(total)}
+      </div>
 
-        return `
+    </div>
 
-          <div class="history-row">
+    ${
+      topCategory
+        ? `
+          <div class="top-category">
 
-            <span>
-              ${date.toLocaleDateString(
-                "en-IN",
-                {
-                  month:"long",
-                  year:"numeric"
-                }
-              )}
-            </span>
+            <div class="top-category-label">
+              TOP CATEGORY
+            </div>
 
-            <strong>
-              ${money(amount)}
-            </strong>
+            <div class="top-category-value">
+              ${escapeHtml(topCategory[0])}
+              ·
+              ${money(topCategory[1])}
+            </div>
 
           </div>
+        `
+        : `
+          <div class="empty">
+            No expenses this month.
+          </div>
+        `
+    }
 
-        `;
+    ${
+      expenses.length
+        ? `
+          <button
+            class="secondary view-month-btn"
+            onclick="showCurrentMonthExpenses()"
+          >
+            View ${monthName} Expenses →
+          </button>
+        `
+        : ""
+    }
 
-      }
-    ).join("");
+  `;
 
 }
 
 
 /* =========================================================
-   BACKUP / RESTORE
+   VIEW CURRENT MONTH EXPENSES
 ========================================================= */
 
-function createBackupObject(){
+function showCurrentMonthExpenses(){
 
-  return {
+  const currentMonth =
+    monthKey(Date.now());
 
-    backupVersion:2,
-
-    appVersion:"Money Tracker V5",
-
-    createdAt:
-      new Date().toISOString(),
-
-    data:JSON.parse(
-      JSON.stringify(data)
-    )
-
-  };
-
-}
-
-
-function exportBackup(){
-
-  try{
-
-    const backup =
-      createBackupObject();
-
-    const json =
-      JSON.stringify(
-        backup,
-        null,
-        2
+  const expenses =
+    [...data.expenses]
+      .filter(
+        expense =>
+          monthKey(expense.date) === currentMonth
+      )
+      .sort(
+        (a,b) => b.date - a.date
       );
 
-    const blob =
-      new Blob(
-        [json],
-        {
-          type:"application/json"
-        }
-      );
+  const [year, month] =
+    currentMonth.split("-");
 
-    const url =
-      URL.createObjectURL(blob);
-
-    const link =
-      document.createElement("a");
-
-    const date =
-      new Date()
-        .toISOString()
-        .slice(0,10);
-
-    link.href = url;
-
-    link.download =
-      `money-tracker-backup-${date}.json`;
-
-    document.body.appendChild(link);
-
-    link.click();
-
-    link.remove();
-
-    URL.revokeObjectURL(url);
-
-    alert(
-      "Backup downloaded successfully."
+  const date =
+    new Date(
+      Number(year),
+      Number(month) - 1,
+      1
     );
 
-  }catch(error){
-
-    console.error(error);
-
-    alert(
-      "Could not create backup."
+  const monthName =
+    date.toLocaleDateString(
+      "en-IN",
+      {
+        month:"long",
+        year:"numeric"
+      }
     );
 
-  }
+  const content =
+    expenses.length
+      ? expenses.map(expense => {
+
+          const source =
+            data.sources.find(
+              source =>
+                source.id === expense.sourceId
+            );
+
+          const category =
+            expense.category ||
+            "Uncategorized";
+
+          return `
+
+            <div class="expense-row">
+
+              <div class="expense-left">
+
+                <div class="expense-name">
+                  ${escapeHtml(
+                    expense.description ||
+                    "Expense"
+                  )}
+                </div>
+
+                <div class="expense-meta">
+
+                  ${escapeHtml(category)}
+                  ·
+                  ${
+                    source
+                      ? escapeHtml(source.name)
+                      : "Unknown"
+                  }
+                  ·
+                  ${new Date(
+                    expense.date
+                  ).toLocaleDateString(
+                    "en-IN"
+                  )}
+
+                </div>
+
+              </div>
+
+              <div class="expense-right">
+
+                <div class="expense-amount">
+                  -${money(expense.amount)}
+                </div>
+
+                <div class="expense-actions">
+
+                  <button
+                    class="small-btn secondary"
+                    onclick="editExpense('${expense.id}')"
+                  >
+                    Edit
+                  </button>
+
+                  <button
+                    class="small-btn danger"
+                    onclick="deleteExpense('${expense.id}');closeModal()"
+                  >
+                    Delete
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          `;
+
+        }).join("")
+      : `
+          <div class="empty">
+            No expenses this month.
+          </div>
+        `;
+
+  openModal(
+    `${monthName} Expenses`,
+    content
+  );
 
 }
-
-
-function validateBackup(backup){
-
-  if(
-    !backup ||
-    typeof backup !== "object"
-  ){
-
-    return false;
-
-  }
-
-
-  const backupData =
-    backup.data;
-
-  if(
-    !backupData ||
-    typeof backupData !== "object"
-  ){
-
-    return false;
-
-  }
-
-
-  if(
-    !Array.isArray(
-      backupData.sources
-    )
-  ){
-
-    return false;
-
-  }
-
-
-  if(
-    !Array.isArray(
-      backupData.expenses
-    )
-  ){
-
-    return false;
-
-  }
-
-
-  if(
-    !Array.isArray(
-      backupData.income
-    )
-  ){
-
-    return false;
-
-  }
-
-
-  return true;
-
-}
-
-
-function importBackupFile(file){
-
-  const reader =
-    new FileReader();
-
-
-  reader.onload = event => {
-
-    try{
-
-      const backup =
-        JSON.parse(
-          event.target.result
-        );
-
-
-      if(
-        !validateBackup(backup)
-      ){
-
-        alert(
-          "This does not look like a valid Money Tracker backup."
-        );
-
-        return;
-
-      }
-
-
-      const backupData =
-        backup.data;
-
-
-      const confirmed =
-        confirm(
-          "Import this backup?\n\n" +
-          "This will replace the current app data with the backup data.\n\n" +
-          "Your current data should already be backed up before continuing."
-        );
-
-
-      if(!confirmed){
-
-        return;
-
-      }
-
-
-      /*
-       * Create an emergency local safety copy
-       * before importing.
-       */
-
-      const safetyCopy =
-        localStorage.getItem(
-          CURRENT_KEY
-        );
-
-
-      if(safetyCopy){
-
-        localStorage.setItem(
-          "moneyTrackerEmergencyBackup",
-          safetyCopy
-        );
-
-      }
-
-
-      data = {
-
-        sources:
-          Array.isArray(
-            backupData.sources
-          )
-            ? backupData.sources
-            : [],
-
-        expenses:
-          Array.isArray(
-            backupData.expenses
-          )
-            ? backupData.expenses
-            : [],
-
-        income:
-          Array.isArray(
-            backupData.income
-          )
-            ? backupData.income
-            : []
-
-      };
-
-
-      /*
-       * Normalize categories.
-       */
-
-      data.expenses =
-        data.expenses.map(expense => {
-
-          if(
-            !expense.category ||
-            String(expense.category).trim() === ""
-          ){
-
-            expense.category =
-              "Uncategorized";
-
-          }
-
-          return expense;
-
-        });
-
-
-      localStorage.setItem(
-        CURRENT_KEY,
-        JSON.stringify(data)
-      );
-
-
-      viewMonth =
-        new Date();
-
-      window.expenseMonthManuallyChanged =
-        false;
-
-
-      render();
-
-      alert(
-        "Backup imported successfully."
-      );
-
-
-    }catch(error){
-
-      console.error(error);
-
-      alert(
-        "Could not read this backup file."
-      );
-
-    }
-
-  };
-
-
-  reader.readAsText(file);
-
-}
-
-
-document.getElementById(
-  "exportBackupBtn"
-).onclick =
-  exportBackup;
-
-
-document.getElementById(
-  "importBackupBtn"
-).onclick = () => {
-
-  document.getElementById(
-    "backupFileInput"
-  ).click();
-
-};
-
-
-document.getElementById(
-  "backupFileInput"
-).addEventListener(
-  "change",
-  event => {
-
-    const file =
-      event.target.files[0];
-
-    if(file){
-
-      importBackupFile(file);
-
-    }
-
-    /*
-     * Allow selecting the same backup again later.
-     */
-
-    event.target.value = "";
-
-  }
-);
 
 
 /* =========================================================
@@ -2432,6 +2054,10 @@ function editSource(id){
       s => s.id === id
     );
 
+  if(!source){
+    return;
+  }
+
   openModal(
 
     "Edit Source",
@@ -2491,6 +2117,10 @@ function updateSource(id){
     data.sources.find(
       s => s.id === id
     );
+
+  if(!source){
+    return;
+  }
 
   const name =
     document.getElementById(
@@ -2890,6 +2520,10 @@ function editExpense(id){
       e => e.id === id
     );
 
+  if(!expense){
+    return;
+  }
+
   const sourceOptions =
     data.sources.map(
       source => {
@@ -3019,6 +2653,10 @@ function updateExpense(id){
     data.expenses.find(
       e => e.id === id
     );
+
+  if(!expense){
+    return;
+  }
 
   const amount =
     Number(
@@ -3199,18 +2837,10 @@ if(
 
 initializeData();
 
-viewMonth =
-  new Date();
-
-window.lastKnownMonth =
-  monthKey(Date.now());
-
-window.expenseMonthManuallyChanged =
-  false;
-
 render();
 
 </script>
 
 </body>
 </html>
+```
