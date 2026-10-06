@@ -1,4 +1,4 @@
-const CACHE_NAME = "money-tracker-v4";
+const CACHE_NAME = "money-tracker-v5";
 
 const FILES_TO_CACHE = [
   "./",
@@ -33,20 +33,26 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-
   event.respondWith(
+    fetch(event.request)
+      .then(response => {
 
-    caches.match(event.request)
-      .then(cached => {
+        if (
+          response &&
+          response.status === 200 &&
+          event.request.method === "GET"
+        ) {
+          const responseClone = response.clone();
 
-        if(cached){
-          return cached;
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseClone);
+          });
         }
 
-        return fetch(event.request);
-
+        return response;
       })
-
+      .catch(() =>
+        caches.match(event.request)
+      )
   );
-
 });
